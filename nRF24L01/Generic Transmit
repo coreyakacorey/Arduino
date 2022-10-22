@@ -1,0 +1,33 @@
+/*********** nRF24L01 Transmitter code ***********/
+/*     Generic code to send data to reciver.     */
+
+
+//Libraries
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+
+//RF24 object
+RF24 radio(9,8); //CE, CSN
+
+//Address of node to communicate with
+const byte address[6] = "00001"; //C string with 5 bytes + terminal char "\0"
+
+void setup(){
+  //Start the radio object
+  radio.begin();
+
+  //Set the comm address
+  radio.openWritingPipe(address);
+  radio.setAutoAck(false); //Send data without wating for acknowledgement
+
+  //Set to transmitter mode
+  radio.stopListening();
+}
+void loop(){
+  //Send message
+  const char text[] = "Hello World"; //32 char (byte) limit, C string = 31 char + terminal char
+  radio.write(&text, sizeof(text));  //Send the data and data size to receiver
+
+  delay(1000); //Send message every second
+}
