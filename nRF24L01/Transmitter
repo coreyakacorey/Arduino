@@ -58,7 +58,7 @@ void setup(){
   radio.openWritingPipe(address);
 
   //Radio settings
-  radio.setAutoAck(false); //Disable send data without waiting for acknowledgement
+  radio.setAutoAck(false); //Send data without waiting for acknowledgement
   radio.setDataRate(RF24_250KBPS); //Lowest data rate, farthest range
 
   //Set to transmitter mode
