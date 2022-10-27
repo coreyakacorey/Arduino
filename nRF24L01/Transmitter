@@ -1,0 +1,173 @@
+/***********   nRF24L01 Transmitter code   **********
+  Transmitter with 2 Joysick using nRF24 RF 
+  transmitter baord. For use with Arduino. Includes 
+  joystick center calibration.
+  
+  
+  Created By: Corey Ankney
+  Date: Oct 2022
+****************************************************/
+
+//Libraries
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+
+//Inputs
+#define jB1 2 //Joystick 1 button
+#define jB2 3 //Joystick 2 button
+
+//RF24 object
+RF24 radio(9,8); //CE, CSN
+
+//Address of node to communicate with
+const byte address[6] = "00001"; //C string with 5 bytes + terminal char "\0"
+
+//Calibration offsets for joysticks
+int offSet1x = 0;
+int offSet1y = 0;
+int offSet2x = 0;
+int offSet2y = 0;
+
+//Structure containing all input variables to be transmitted
+struct Data_Package{
+  byte js1X;     //Joystick 1 x-axis
+  byte js1Y;     //Joysitck 1 y-axis
+  byte js1Btn;   //Joystick 1 button
+  byte js2X;     //Joystick 2 x-axis
+  byte js2Y;     //Joysitck 2 y-axis
+  byte js2Btn;   //Joystick 2 button
+};
+
+//Variable to hold structured data to be transmitted
+Data_Package data;
+
+void setup(){
+  
+  //For debugging
+  //Serial.begin(9600);
+
+  //Set button pins as inputs and activate pull-up resistors
+  pinMode(jB1, INPUT_PULLUP);
+  pinMode(jB2, INPUT_PULLUP);
+  
+  //Start the radio object
+  radio.begin();
+
+  //Set the comm address
+  radio.openWritingPipe(address);
+
+  //Radio settings
+  radio.setAutoAck(false); //Disable send data without waiting for acknowledgement
+  radio.setDataRate(RF24_250KBPS); //Lowest data rate, farthest range
+
+  //Set to transmitter mode
+  radio.stopListening();
+
+  //Calibrate joystick center position
+  calibrate();
+}
+void loop(){
+  
+  //Read all analog inputs
+  data.js1X = getAnalogValues(A7, offSet1x); //Use getAnalogValues functions to get the value with calibration correction
+  data.js1Y = getAnalogValues(A6, offSet1y);
+  data.js2X = getAnalogValues(A0, offSet2x);
+  data.js2Y = getAnalogValues(A1, offSet2y);
+
+  //Debug output
+  /*Serial.print("JS1x: ");
+  Serial.print(data.js1X);
+  Serial.print(" JS1y: ");
+  Serial.println(data.js1Y);
+  Serial.print("JS2x: ");
+  Serial.print(data.js2X );
+  Serial.print(" JS2y: ");
+  Serial.println(data.js2Y);*/
+  
+  //Read all digital inputs
+  data.js1Btn = digitalRead(jB1);
+  data.js2Btn = digitalRead(jB2);
+
+  //Debug output
+  /*Serial.print("JS1btn: ");
+  Serial.print(data.js1Btn);
+  Serial.print("JS2btn: ");
+  Serial.println(data.js2Btn);*/
+
+  //Calibrate joystick centers when JS1 button is pressed
+  if(data.js1Btn == 0){
+    calibrate();
+  }
+  
+  //Send message (address of data to be sent, size of data to be sent)
+  radio.write(&data, sizeof(data));
+
+  delay(1); //Small delay to improve tranmission performance
+}
+
+//Calibrate joystick center position
+void calibrate(){
+  
+  //Get initial positions, map to BYTE size
+  data.js1X = map(analogRead(A7), 0, 1023, 0, 255);
+  data.js1Y = map(analogRead(A6), 0, 1023, 0, 255);
+  data.js2X = map(analogRead(A0), 0, 1023, 0, 255);
+  data.js2Y = map(analogRead(A1), 0, 1023, 0, 255);
+
+  //Debug output
+  /*Serial.println("******CALIBRATION DATA******");
+  Serial.print("JS1x: ");
+  Serial.print(data.js1X);
+  Serial.print(" JS1y: ");
+  Serial.println(data.js1Y);
+  Serial.print("JS2x: ");
+  Serial.print(data.js2X);
+  Serial.print(" JS2y: ");
+  Serial.println(data.js2Y);*/
+
+  //Calculate offset, distance from center (127)
+  offSet1x = (data.js1X - 127);
+  offSet1y = (data.js1Y - 127);
+  offSet2x = (data.js2X - 127);
+  offSet2y = (data.js2Y - 127);
+  
+  //Debug output
+  /*Serial.print("JS1X offset: ");
+  Serial.print(offSet1x);
+  Serial.print(" JS1Y offset: ");
+  Serial.println(offSet1y);
+  Serial.print("JS2X offset: ");
+  Serial.print(offSet2x);
+  Serial.print(" JS2Y offset: ");
+  Serial.println(offSet2y);
+  Serial.println("****************************");*/
+}
+
+//Get analog values from joystick, with calibration offset and mapped to BYTE size 
+byte getAnalogValues(byte pin, int offSet){
+  
+  //Hold data while performing operations
+  int holder = 0;
+
+  holder = (map(analogRead(pin), 0, 1023, 0, 255) - offSet);
+  holder = boundsCheck(holder); //Ensure value is within specified bounds
+
+  return holder;
+}
+
+//Ensure values is between 0 and 255
+int boundsCheck(int value){
+  
+  //Set floor of 0
+  if(value < 0){
+    value = 0;
+  }
+
+  //set ceiling of 255
+  else if(value > 255){
+    value = 255;
+  }
+
+  return value;
+}
