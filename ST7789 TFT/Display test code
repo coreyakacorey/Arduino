@@ -1,4 +1,20 @@
-/*
+/***********   ST7789 TFT display test    ***********
+ Creates a basic menu screen to test the functionallity
+ of the ST7789 TFT display with an arduino 
+ micro-controller and 2 push buttons to interface with 
+ the menu. The code is written for the 1.3" 240x240 
+ display but can be modified for different size 
+ displays.
+ 
+ The program has a home screen with 3 buttons that
+ display 3 different menus. Menu 1 displays a sample
+ graph. Menu 2 is an animation of nested colored boxes.
+ Menu 3 is a sine wave generator.
+
+  
+  Created By: Corey Ankney
+  Date: Nov 2022
+****************************************************/
 
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
@@ -117,8 +133,10 @@ char graphTextX[4] = {'T', 'i', 'm', 'e'};
 
 void setup() {
   //For troubleshooting
-  Serial.begin(9600);
-  randomSeed(analogRead(A0)); //Seed random number generator from unconnected pin
+  //Serial.begin(9600);
+  
+  //Seed random number generator from unconnected pin
+  randomSeed(analogRead(A0)); 
 
   //Screen initializtion code pulled from example code
   // if the display has CS pin try with SPI_MODE0
@@ -132,15 +150,13 @@ void setup() {
 
   //Create the button structs
   addButtons();
-
+  
   drawHomeScreen();
 }
 
 void loop() {
-  //For troubleshooting
-  //Serial.println(buttonChoice);
 
-  //Change selected button when button 1 is pressed
+  //Change selected menu button when button 1 is pressed
   if(digitalRead(buttonPin1) == LOW){
     buttonSelect();
     
@@ -148,21 +164,18 @@ void loop() {
     delay(200);
   }
 
-  //Perform function tied to selected button when button 2 is pressed
+  //Perform function tied to selected menu button when button 2 is pressed
   if(digitalRead(buttonPin2) == LOW){
     switch(buttonChoice){
 
-      //Button 1 function
       case 0:
         menu1();
         break;
-
-      //Button 2 function
+        
       case 1:
         menu2();
         break;
-
-       //Button 3 function
+        
        case 2:
         menu3();
         break;
@@ -216,10 +229,10 @@ void drawRoundRect(RoundedSquare toDraw){
     toDraw.color);
 }
 
-//Creates struct variables and inserts them into an array
+//Creates the menu button variables and menu select and deselect variables and inserts them into an array
 void addButtons(){
 
-  //Create srtuct variable for 3 buttons
+  //Create srtuct variable for 3 menu buttons
   for(int i = 0; i < 3; i++){
     RoundedSquare newButton = {
       ((margin * 2)+ frameWidth) + ((buttonWidth * i) + (margin * i)),
@@ -230,10 +243,10 @@ void addButtons(){
       blue
     };
     
-    //Put the buttons in buttonArray
+    //Put the menu buttons in buttonArray
     buttonArray[i] = newButton;
     
-    //Create srtuct variable for 3 button select frames that surround the current button choice
+    //Create srtuct variable for 3 menu button select frames that surround the current menu button choice
     RoundedSquare newButtonSelect = {
       ((margin * 2) + (frameWidth)) + ((buttonWidth * i) + (margin * i)),
       (140 - (frameWidth / 4)),
@@ -243,10 +256,10 @@ void addButtons(){
       silver
     };
 
-    //Put the button frames in buttonSelectArray
+    //Put the menu button frames in buttonSelectArray
     buttonSelectArray[i] = newButtonSelect;
 
-    //Create srtuct variable for 3 background colored button frames to erase frame from previous button choice
+    //Create srtuct variable for 3 background colored menu button frames to erase frame from previous button choice
     RoundedSquare newButtonDeselect = {
       ((margin * 2) + (frameWidth)) + ((buttonWidth * i) + (margin * i)),
       (140 - (frameWidth / 4)),
@@ -256,12 +269,13 @@ void addButtons(){
       mainBgColor
     };
     
-    //Put the button frames in buttonDeselectArray
+    //Put the menu button frames in buttonDeselectArray
     buttonDeselectArray[i] = newButtonDeselect;
   }
 }
 
 void drawHomeScreen(){
+  //Start on menu button 1 by default
   buttonChoice = 0;
   
   //Draw the background and border
@@ -269,7 +283,7 @@ void drawHomeScreen(){
   drawFillSquare(greySquare);
   drawFillSquare(innerSquare);
 
-  //Draw the buttons stored in buttonArray
+  //Draw the menu buttons stored in buttonArray
   for(int i = 0; i < 3; i++){
     drawFillRoundRect(buttonArray[i]);
     tft.drawChar(buttonArray[i].xStart + frameWidth,
@@ -280,39 +294,44 @@ void drawHomeScreen(){
     2);
   }
 
-  //Draw button select border on button 1 by default 
+  //Draw menu button select border on button 1 by default 
   drawRoundRect(buttonSelectArray[0]);
 }
 
 void buttonSelect(){  
   buttonChoice++;
 
-  //Limit button choices to stay within array bounds, if out of bound reset to start
+  //Limit menu button choices to stay within array bounds, if out of bound reset to start
   if(buttonChoice > 2){
     buttonChoice = 0;
   }
 
-  //Move button select border to next button
+  //Move menu button select border to next button
   drawRoundRect(buttonSelectArray[buttonChoice]);
 
-  //If selecting button 1, deselect button 3 in case of complete button choice cycle
+  //If selecting menu button 1, deselect menu button 3 in case of complete menu button choice cycle
   if(buttonChoice == 0){
     drawRoundRect(buttonDeselectArray[2]);
   }
   
-  //If not button one, deselect previous button
+  //If not selecting menu button one, deselect previous button
   else{
     drawRoundRect(buttonDeselectArray[buttonChoice - 1]);
   }
 }
 
+//Menu 1 function, draws a sample graph
 void menu1(){
+  //variables, x and y-axis division labels, coutner, and exit flag
   int x = 10;
   int y = 9;
   int count = 1;
   bool back = 0;
   
+  //Draw the background color
   tft.fillScreen(menu1BgColor);
+  
+  //Create a back button, demonstration only as it does not change or respond at this time
   drawFillSquare(backButton);
   drawSquare(backButtonBorder);
   tft.setCursor(backButtonBorder.xStart + 4, backButtonBorder.yStart + 4);
@@ -322,35 +341,57 @@ void menu1(){
   tft.setCursor(20, 10);
   tft.setTextColor(mainBgColor);
   tft.setTextSize(2);
+  
+  //Menu title
   tft.println("Menu 1");
+  
+  //Creat a sample graph
   tft.fillRect(30, 30, 200, 180, mainBgColor);
+  
+  //Draw the x-asix divisions (vertical lines), at 20 pixel intervals
   for(x; x >= 0; x--){
     tft.drawLine(30 + (x * 20), 30, 30 + (x * 20) , 209, grey);
   }  
+  
+  //Draw the y-axis divisions (horizontal lines, at 20 pixel intervals
   for(y; y >= 0; y--){
     tft.drawLine(30, 30 + (y * 20), 230, 30 + (y * 20), grey);
   }
+  
+  //Add division numbers to the x-axis
   for(x = 10; x >= 0; x--){
+    
+    //Print "1" and "0" separatly for number ten
     if(x == 10){
       tft.drawChar(30 + (x * 20), 212, buttonTextArray[0], ST77XX_WHITE, menu1BgColor, 1);
       tft.drawChar(24 + (x * 20), 212, buttonTextArray[1], ST77XX_WHITE, menu1BgColor, 1);
     }
+    
+    //If not number ten just print single digit
     else{
     tft.drawChar(28 + (x * 20), 212, buttonTextArray[x], ST77XX_WHITE, menu1BgColor, 1);
     }
   }
+  
+  //Add division numbers to the y-axis, skip 0 since it has already been printed (number is based on count variable and not y)
   for(y = 9; y >= 0; y--){
     if(y < 9){
       tft.drawChar(24, 28 + (y * 20), buttonTextArray[count], ST77XX_WHITE, ST77XX_WHITE, 1);
       count++;
     }
   }
+  
+  //Print the x-axis label
   for(int i = 0; i < 4; i++){
     tft.drawChar(90 + (18 * i), 224, graphTextX[i], ST77XX_RED, menu1BgColor, 2);
   }
+  
+  //Print the y-axis label
   for(int i = 0; i < 8; i++){
     tft.drawChar(3, 50 + (18 * i), graphTextY[i], ST77XX_RED, menu1BgColor, 2);
   }
+  
+  //Check if button 2 has been pressed in infinite loop, if pressed exit to home screen
   while(!back){
     if(digitalRead(buttonPin2) == LOW){
       back = !back;
@@ -359,66 +400,114 @@ void menu1(){
   }
 }
 
+//Menu 2 functions, nested square animation. Sqaure grows from center to the size of the 
+//screen and then another square grows on top with a 4 pixel smaller perimeter in a loop.
 void menu2(){
+
+  //Half of one side of the initial square perimeter (one pixel larger than screen length to 
+  //ensure it covers te screen)
   int s = 121;
-  //int16_t randomColor;
+  
+  //Exit flag
   bool back = 0;
   
   tft.fillScreen(menu1BgColor);
+  
+  //Draw squares on top of each other each 4 pixels in from the last square on each side
   for(s; s > 0; s-=4){
+  
+    //Generate a new color for each box
     randomColor = random(0x0, 0xFFFFFF);
+    
+    //Grow the box from the center
     for(int i = 1; i <= s; i+=4){
       tft.fillRect(120 - i, 120 - i, i * 2, i * 2, randomColor);
+      
+      //Check if button 2 was pressed, if pressed set exit flag and break out of loop
       if(digitalRead(buttonPin2) == LOW){
         back = !back;
         break;
       }
     }
+    
+    //If exit flag is set break out of loop
     if(back){
       break;
     }
   }
+  
+  //If exit flag is set retrun to home screen
   if(back){
     drawHomeScreen();
   }
 }
 
+//Menu 3 functions, sine wave generator
 void menu3(){
-  bool back = 0;
-  int amplitude = 20; //120 for full screen
-  float sinValue = 0;
-  int frequency = 1;
+
+  bool back = 0;      //Exit flag
+  int amplitude = 20; //Sine wave ampituded 120 for full screen
+  float sinValue = 0; //current sine value in radians, used for pixel location
+  int frequency = 1;  //Sine wave frequency
   int x=0;
   
   
   tft.fillScreen(mainBgColor);
 
+  //Creates 10 sine waves, one at a time, clearing the last before drawing the new one
   for(int s = 0; s < 10; s++){
+  
+    //Each wave has a random color
     randomColor = random(0x0, 0xFFFFFF);
+    
+    //Set the cursor position after loop
     x = 0;
+    
+    //Draw the wave until the end of the screen (240 pixels)
     for(int i = 0; i <= (240 * frequency); i++){
+    
+      // Check if button 2 is pressed, if pressed set the exit flag and break loop
       if(digitalRead(buttonPin2) == LOW){
         back = !back;
         break;
       }
+      
+      //Get the sine value
       sinValue = (sin(radians(i)));
+      
+      //Only move cursor along the x-axis 240 times (screen size), (i will count to 
+      //screen size * frequency so dividing i by frequency will have a remainder of 0 only 240 times)
       if((i % frequency) == 0){
         x++;
+        
+        //Erase previous wave by drawing a vertical baground colored line
         tft.drawFastVLine(x, 0, 240, mainBgColor);
+        
+        //Draw current waveform pixel along the x-axis
         tft.drawPixel(x,120 - (sinValue * amplitude), randomColor);
       }
+      
+      //Draw current waveform pixel along the y-axis
       tft.drawPixel(x,120 - (sinValue * amplitude), randomColor);
     }
+    
+    //If exit flag set, break loop
     if(back){
       break;
     }
+    
+    //Demonstration, change the frequency by one and the amplitude by 10 with each full cycle
     frequency++;
     amplitude+=10;
   }
+  
+  //If exit flag set, retrun to home screen
   if(back){
       drawHomeScreen();
     }
   
+  //If animation is finished check if button 2 has been pressed in infinite loop
+  //If pressed exit to home screen
   while(!back){
     if(digitalRead(buttonPin2) == LOW){
       back = !back;
