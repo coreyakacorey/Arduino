@@ -1,0 +1,427 @@
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
+#include <SPI.h>             // Arduino SPI library
+ 
+// ST7789 TFT module connections
+#define TFT_CS     10 //Chip select, usually low when controller sends data to disply
+#define TFT_RST    8  // define reset pin, or set to -1 and connect to Arduino RESET pin
+#define TFT_DC     9  // define Data/Command control pin, bi-direction data pin 
+//SCL is the SPI clock line or sclk, connect to arduino sck pin, usually pin 13
+//SDA is the SPI data line or MOSI, connect to arduino MOSI pin, usually pin 11
+//BLK is the display backlight control, defualt on, low is off, can accept PWM for brightness control
+ 
+// Initialize Adafruit ST7789 TFT library
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+
+//Variables
+//Input buttons conntected to arduino
+const int buttonPin1 = A4;
+const int buttonPin2 = A3;
+
+//Colors, 16 bit colors (5 bits for red, 6 bits for green, and 5 bits for blue) use colors defined in the library or write in a hex value to choose a color.
+int16_t mainBgColor = ST77XX_BLACK;
+int16_t menu1BgColor = 0xADC1;
+int16_t silver = 0xDEDB;
+int16_t blue = 0x105E;
+int16_t darkBlue =0x0837;
+int16_t grey = 0x8410;
+int16_t randomColor;
+
+//values to assist with graphics placement
+int margin = 20;
+int buttonHeight = 30;
+int buttonWidth = 40;
+byte cornerRadius = 4;
+byte frameWidth = 4;
+float Pi = 3.14159;
+
+//On-screen button choice
+int buttonChoice = 0;
+
+//Structs declarations
+struct Square{
+  int xStart;
+  int yStart;
+  int height;
+  int width;
+  int16_t color;
+};
+
+//Square with round corners
+struct RoundedSquare{
+  int xStart;
+  int yStart;
+  int height;
+  int width;
+  byte cornerRadius;
+  int16_t color;
+};
+
+//Struct variables, uesed to draw individual graphics
+//Outside border
+Square greySquare = {
+  margin,
+  margin,
+  240 - (margin * 2),
+  240 - (margin * 2),
+  silver,
+};
+
+//Creates the border by covering inner-portion of greySquare
+Square innerSquare = {
+  greySquare.xStart + frameWidth,
+  greySquare.yStart + frameWidth,
+  greySquare.height - frameWidth * 2,
+  greySquare.width - frameWidth * 2,
+  mainBgColor
+};
+
+//Back button
+Square backButton = {
+  200,
+  5,
+  20,
+  35,
+  silver
+};
+
+//Back button border
+Square backButtonBorder = {
+  backButton.xStart + 2,
+  backButton.yStart + 2,
+  backButton.height - frameWidth,
+  backButton.width - frameWidth,
+  mainBgColor
+};
+
+//Background colored box to cover old text before an update
+Square textCover = {
+  innerSquare.xStart,
+  60,
+  20,
+  innerSquare.width,
+  mainBgColor
+};
+
+//Arrays to hold variations of struct variables
+RoundedSquare buttonArray[3] = {{0}};
+RoundedSquare buttonSelectArray[3] = {{0}};
+RoundedSquare buttonDeselectArray[3] = {{0}};
+
+//Array to hold button text
+char buttonTextArray[10] = {'0','1', '2', '3', '4', '5', '6', '7', '8', '9'};
+char graphTextY[8] = {'D', 'i', 's', 't', 'a', 'n', 'c', 'e'};
+char graphTextX[4] = {'T', 'i', 'm', 'e'};
+
+void setup() {
+  //For troubleshooting
+  Serial.begin(9600);
+  randomSeed(analogRead(A0)); //Seed random number generator from unconnected pin
+
+  //Screen initializtion code pulled from example code
+  // if the display has CS pin try with SPI_MODE0
+  tft.init(240, 240, SPI_MODE2);    // Init ST7789 display 240x240 pixel
+  //Set screen orientation
+  tft.setRotation(2);
+
+  //Initialize button pins as inputs with pullup resistors, normally high and low when pressed
+  pinMode(buttonPin1, INPUT_PULLUP);
+  pinMode(buttonPin2, INPUT_PULLUP);
+
+  //Create the button structs
+  addButtons();
+
+  drawHomeScreen();
+}
+
+void loop() {
+  //For troubleshooting
+  //Serial.println(buttonChoice);
+
+  //Change selected button when button 1 is pressed
+  if(digitalRead(buttonPin1) == LOW){
+    buttonSelect();
+    
+    //Delay to prevent button bounce
+    delay(200);
+  }
+
+  //Perform function tied to selected button when button 2 is pressed
+  if(digitalRead(buttonPin2) == LOW){
+    switch(buttonChoice){
+
+      //Button 1 function
+      case 0:
+        menu1();
+        break;
+
+      //Button 2 function
+      case 1:
+        menu2();
+        break;
+
+       //Button 3 function
+       case 2:
+        menu3();
+        break;
+    }
+
+    //Delay to prevent button bounce
+    delay(200);
+  }
+}
+
+//Functions
+//Draw a filled in square by passing a Square struct variable
+void drawFillSquare(Square toDraw){
+  tft.fillRect(
+    toDraw.xStart,
+    toDraw.yStart,
+    toDraw.width,
+    toDraw.height,
+    toDraw.color);
+}
+
+//Draw square perimeter by passing a Square struct variable
+void drawSquare(Square toDraw){
+  tft.drawRect(
+    toDraw.xStart,
+    toDraw.yStart,
+    toDraw.width,
+    toDraw.height,
+    toDraw.color);
+}
+
+//Draw a filled in rectangle with rounded corners by pasing a RoundedSquare struct variable
+void drawFillRoundRect(RoundedSquare toDraw){
+  tft.fillRoundRect(
+    toDraw.xStart,
+    toDraw.yStart,
+    toDraw.width,
+    toDraw.height,
+    toDraw.cornerRadius,
+    toDraw.color);
+}
+
+//Draw rectagle perimeter with rounded corners by passing a RoundedSquare struct variable
+void drawRoundRect(RoundedSquare toDraw){
+  tft.drawRoundRect(
+    toDraw.xStart,
+    toDraw.yStart,
+    toDraw.width,
+    toDraw.height,
+    toDraw.cornerRadius,
+    toDraw.color);
+}
+
+//Creates struct variables and inserts them into an array
+void addButtons(){
+
+  //Create srtuct variable for 3 buttons
+  for(int i = 0; i < 3; i++){
+    RoundedSquare newButton = {
+      ((margin * 2)+ frameWidth) + ((buttonWidth * i) + (margin * i)),
+      140,
+      buttonWidth,
+      buttonHeight,
+      cornerRadius,
+      blue
+    };
+    
+    //Put the buttons in buttonArray
+    buttonArray[i] = newButton;
+    
+    //Create srtuct variable for 3 button select frames that surround the current button choice
+    RoundedSquare newButtonSelect = {
+      ((margin * 2) + (frameWidth)) + ((buttonWidth * i) + (margin * i)),
+      (140 - (frameWidth / 4)),
+      (buttonWidth + (frameWidth / 2)),
+      (buttonHeight+ (frameWidth / 4)),
+      cornerRadius,
+      silver
+    };
+
+    //Put the button frames in buttonSelectArray
+    buttonSelectArray[i] = newButtonSelect;
+
+    //Create srtuct variable for 3 background colored button frames to erase frame from previous button choice
+    RoundedSquare newButtonDeselect = {
+      ((margin * 2) + (frameWidth)) + ((buttonWidth * i) + (margin * i)),
+      (140 - (frameWidth / 4)),
+      (buttonWidth + (frameWidth / 2)),
+      (buttonHeight+ (frameWidth / 4)),
+      cornerRadius,
+      mainBgColor
+    };
+    
+    //Put the button frames in buttonDeselectArray
+    buttonDeselectArray[i] = newButtonDeselect;
+  }
+}
+
+void drawHomeScreen(){
+  buttonChoice = 0;
+  
+  //Draw the background and border
+  tft.fillScreen(mainBgColor);
+  drawFillSquare(greySquare);
+  drawFillSquare(innerSquare);
+
+  //Draw the buttons stored in buttonArray
+  for(int i = 0; i < 3; i++){
+    drawFillRoundRect(buttonArray[i]);
+    tft.drawChar(buttonArray[i].xStart + frameWidth,
+    buttonArray[i].yStart + frameWidth,
+    buttonTextArray[i + 1],
+    mainBgColor,
+    blue,
+    2);
+  }
+
+  //Draw button select border on button 1 by default 
+  drawRoundRect(buttonSelectArray[0]);
+}
+
+void buttonSelect(){  
+  buttonChoice++;
+
+  //Limit button choices to stay within array bounds, if out of bound reset to start
+  if(buttonChoice > 2){
+    buttonChoice = 0;
+  }
+
+  //Move button select border to next button
+  drawRoundRect(buttonSelectArray[buttonChoice]);
+
+  //If selecting button 1, deselect button 3 in case of complete button choice cycle
+  if(buttonChoice == 0){
+    drawRoundRect(buttonDeselectArray[2]);
+  }
+  
+  //If not button one, deselect previous button
+  else{
+    drawRoundRect(buttonDeselectArray[buttonChoice - 1]);
+  }
+}
+
+void menu1(){
+  int x = 10;
+  int y = 9;
+  int count = 1;
+  bool back = 0;
+  
+  tft.fillScreen(menu1BgColor);
+  drawFillSquare(backButton);
+  drawSquare(backButtonBorder);
+  tft.setCursor(backButtonBorder.xStart + 4, backButtonBorder.yStart + 4);
+  tft.setTextColor(mainBgColor);
+  tft.setTextSize(1);
+  tft.println("back");
+  tft.setCursor(20, 10);
+  tft.setTextColor(mainBgColor);
+  tft.setTextSize(2);
+  tft.println("Menu 1");
+  tft.fillRect(30, 30, 200, 180, mainBgColor);
+  for(x; x >= 0; x--){
+    tft.drawLine(30 + (x * 20), 30, 30 + (x * 20) , 209, grey);
+  }  
+  for(y; y >= 0; y--){
+    tft.drawLine(30, 30 + (y * 20), 230, 30 + (y * 20), grey);
+  }
+  for(x = 10; x >= 0; x--){
+    if(x == 10){
+      tft.drawChar(30 + (x * 20), 212, buttonTextArray[0], ST77XX_WHITE, menu1BgColor, 1);
+      tft.drawChar(24 + (x * 20), 212, buttonTextArray[1], ST77XX_WHITE, menu1BgColor, 1);
+    }
+    else{
+    tft.drawChar(28 + (x * 20), 212, buttonTextArray[x], ST77XX_WHITE, menu1BgColor, 1);
+    }
+  }
+  for(y = 9; y >= 0; y--){
+    if(y < 9){
+      tft.drawChar(24, 28 + (y * 20), buttonTextArray[count], ST77XX_WHITE, ST77XX_WHITE, 1);
+      count++;
+    }
+  }
+  for(int i = 0; i < 4; i++){
+    tft.drawChar(90 + (18 * i), 224, graphTextX[i], ST77XX_RED, menu1BgColor, 2);
+  }
+  for(int i = 0; i < 8; i++){
+    tft.drawChar(3, 50 + (18 * i), graphTextY[i], ST77XX_RED, menu1BgColor, 2);
+  }
+  while(!back){
+    if(digitalRead(buttonPin2) == LOW){
+      back = !back;
+      drawHomeScreen();
+    }
+  }
+}
+
+void menu2(){
+  int s = 121;
+  //int16_t randomColor;
+  bool back = 0;
+  
+  tft.fillScreen(menu1BgColor);
+  for(s; s > 0; s-=4){
+    randomColor = random(0x0, 0xFFFFFF);
+    for(int i = 1; i <= s; i+=4){
+      tft.fillRect(120 - i, 120 - i, i * 2, i * 2, randomColor);
+      if(digitalRead(buttonPin2) == LOW){
+        back = !back;
+        break;
+      }
+    }
+    if(back){
+      break;
+    }
+  }
+  if(back){
+    drawHomeScreen();
+  }
+}
+
+void menu3(){
+  bool back = 0;
+  int amplitude = 20; //120 for full screen
+  float sinValue = 0;
+  int frequency = 1;
+  int x=0;
+  
+  
+  tft.fillScreen(mainBgColor);
+
+  for(int s = 0; s < 10; s++){
+    randomColor = random(0x0, 0xFFFFFF);
+    x = 0;
+    for(int i = 0; i <= (240 * frequency); i++){
+      if(digitalRead(buttonPin2) == LOW){
+        back = !back;
+        break;
+      }
+      sinValue = (sin(radians(i)));
+      if((i % frequency) == 0){
+        x++;
+        tft.drawFastVLine(x, 0, 240, mainBgColor);
+        tft.drawPixel(x,120 - (sinValue * amplitude), randomColor);
+      }
+      tft.drawPixel(x,120 - (sinValue * amplitude), randomColor);
+    }
+    if(back){
+      break;
+    }
+    frequency++;
+    amplitude+=10;
+  }
+  if(back){
+      drawHomeScreen();
+    }
+  
+  while(!back){
+    if(digitalRead(buttonPin2) == LOW){
+      back = !back;
+      drawHomeScreen();
+    }
+  }
+}
+
